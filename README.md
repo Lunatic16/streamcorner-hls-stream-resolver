@@ -313,5 +313,4 @@ app-sc/
 ## ⚠️ Disclaimer
 
 This tool is strictly for personal research, educational purposes, and interoperability analysis. All trademarks, channel names, and content belong to their respective owners. Do not use this tool to bypass DRM or violate third-party terms of service.
-# streamcorner-hls-stream-resolver
-# streamcorner-hls-stream-resolver
+
