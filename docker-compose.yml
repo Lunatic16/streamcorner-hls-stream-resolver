@@ -1,0 +1,10 @@
+services:
+  streamcorner-proxy:
+    build: .
+    container_name: streamcorner-hls-proxy
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3004}:3000"
+    environment:
+      - PORT=3000
+      - HOST=0.0.0.0

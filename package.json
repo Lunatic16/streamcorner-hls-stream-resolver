@@ -1,0 +1,13 @@
+{
+  "name": "streamcorner-hls-proxy",
+  "version": "1.0.0",
+  "description": "StreamCorner HLS Stream Resolver & Proxy — browse streamcorner.st live streams, bridge obfuscated Cloudflare worker mirrors, resolve manifests, proxy HLS playback, and serve dynamic IPTV playlists.",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "build": "node scripts/build.js"
+  },
+  "dependencies": {
+    "playwright": "^1.64.1"
+  }
+}

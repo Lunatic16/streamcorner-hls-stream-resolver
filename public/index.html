@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Browse streamcorner.st events & live channels, resolve HLS & DASH streams, play in-browser, or copy links for VLC and MPV.">
+  <title>StreamCorner Stream Browser</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/shaka-player@5.1.13/dist/shaka-player.compiled.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="top__brand">
+        <h1 class="top__title">📺 StreamCorner Stream Browser</h1>
+        <p class="top__desc">Browse live events & channels from <a href="https://streamcorner.st" target="_blank" rel="noopener">streamcorner.st</a>, pick a stream, and play it here or copy links for VLC/MPV.</p>
+      </div>
+      <div class="top__actions">
+        <a id="playlist-btn" class="btn btn--playlist" href="/playlist.m3u8" download="playlist.m3u8" title="Download the live M3U8 playlist for TiviMate, IPTV Smarters, VLC, Jellyfin, etc.">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v8m0 0L5 7m3 3 3-3"/><path d="M2 11v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-2"/></svg>
+          Live Playlist
+        </a>
+        <button id="copy-playlist-btn" class="btn btn--copy-playlist" type="button" title="Copy playlist URL to clipboard">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="8" height="8" rx="1"/><path d="M3 11V3a1 1 0 0 1 1-1h8"/></svg>
+          <span class="btn__label">Copy URL</span>
+        </button>
+      </div>
+    </header>
+
+    <section class="card browser-card" id="browser-card">
+      <div class="browser" id="events-container">
+        <div class="browser__filters">
+          <input id="filter" type="search" placeholder="Search streams or channels…" aria-label="Search streams" autocomplete="off">
+          <select id="category" aria-label="Category">
+            <option value="">All categories & providers</option>
+          </select>
+        </div>
+        <div class="browser__bar">
+          <div class="seg" id="status-seg" role="group" aria-label="Show">
+            <button type="button" class="seg__btn is-active" data-status="live" aria-pressed="true">Live <span class="seg__n" id="n-live">0</span></button>
+            <button type="button" class="seg__btn" data-status="upcoming" aria-pressed="false">Upcoming <span class="seg__n" id="n-upcoming">0</span></button>
+            <button type="button" class="seg__btn" data-status="all" aria-pressed="false">All <span class="seg__n" id="n-all">0</span></button>
+          </div>
+          <button id="refresh-btn" class="icon-btn" type="button" title="Refresh streams" aria-label="Refresh streams">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.5 2.5v3h-3"/></svg>
+          </button>
+        </div>
+        <div id="events" class="browser__list" role="list"></div>
+      </div>
+
+      <div id="source-section" class="source-section" hidden>
+        <button id="back-btn" class="back-btn" type="button">← Back to streams</button>
+        <div id="source-list"></div>
+      </div>
+    </section>
+
+    <aside id="placeholder" class="card placeholder">
+      <p class="placeholder__title">Nothing playing</p>
+      <p class="placeholder__desc">Pick a stream or channel on the left, then select a source to start watching.</p>
+    </aside>
+
+    <section id="out" class="stack" hidden>
+      <div class="card">
+        <div class="player-head">
+          <h2 id="title" class="stream-title">Stream</h2>
+          <div class="player-head-actions">
+            <a id="ext-btn" class="btn btn--sm" href="#" target="_blank" rel="noopener" hidden>External Player ↗</a>
+            <button id="close-btn" class="icon-btn" type="button" title="Stop and close player" aria-label="Stop and close player">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="player">
+          <video id="vid" controls autoplay playsinline></video>
+          <iframe id="frame" allow="autoplay; fullscreen; encrypted-media" hidden></iframe>
+          <div id="player-status" class="player__status" hidden>
+            <span class="spinner" aria-hidden="true"></span>
+            <span id="player-status-text">Resolving stream…</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="section-title">Export</h3>
+        <ul class="exports">
+          <li class="export">
+            <div class="export__meta">
+              <span class="export__name">Direct URL</span>
+              <span class="export__hint">Upstream manifest or stream URL</span>
+            </div>
+            <div class="export__row">
+              <input id="direct" readonly aria-label="Direct URL">
+              <button type="button" data-copy="direct">Copy</button>
+            </div>
+          </li>
+          <li class="export">
+            <div class="export__meta">
+              <span class="export__name">Proxied URL</span>
+              <span class="export__hint">HLS stream through this proxy</span>
+            </div>
+            <div class="export__row">
+              <input id="proxy" readonly aria-label="Proxied URL">
+              <button type="button" data-copy="proxy">Copy</button>
+            </div>
+          </li>
+          <li class="export">
+            <div class="export__meta">
+              <span class="export__name">VLC</span>
+              <span class="export__hint">Open Network Stream command</span>
+            </div>
+            <div class="export__row">
+              <input id="vlc" readonly aria-label="VLC command">
+              <button type="button" data-copy="vlc">Copy</button>
+            </div>
+          </li>
+          <li class="export">
+            <div class="export__meta">
+              <span class="export__name">MPV</span>
+              <span class="export__hint">Terminal command with DRM keys if needed</span>
+            </div>
+            <div class="export__row">
+              <input id="mpv" readonly aria-label="MPV command">
+              <button type="button" data-copy="mpv">Copy</button>
+            </div>
+          </li>
+          <li class="export">
+            <div class="export__meta">
+              <span class="export__name">Embed URL</span>
+              <span class="export__hint">Original stream embed page</span>
+            </div>
+            <div class="export__row">
+              <input id="embed" readonly aria-label="Embed URL">
+              <button type="button" data-copy="embed">Copy</button>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <p id="err" class="msg msg--err" role="alert" hidden></p>
+  </div>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
