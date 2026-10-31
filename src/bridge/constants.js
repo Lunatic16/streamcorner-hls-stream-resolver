@@ -1,8 +1,6 @@
 export const SITE = 'https://streamcorner.st'
 export const ASSETS = `${SITE}/assets/`
 
-export const WORKER_CHUNKS = ['BCJZAtsV.js', 'TYiWbeTw.js', 'CZSRciDc.js', 'm8LErQpA.js']
-
 export const MIRRORS = [
   'data.gigav.workers.dev',
   'data.yedmzoa.workers.dev',
@@ -52,39 +50,40 @@ export const BRANDED = {
   skygo: [],
 }
 
-export const HARNESS_HTML = `<!DOCTYPE html>
+export function createHarnessHtml(catalogModule) {
+  if (!/^[A-Za-z0-9_-]+\.js$/.test(catalogModule)) {
+    throw new Error('Invalid catalog module filename')
+  }
+  const modulePath = JSON.stringify(`./${catalogModule}`)
+  return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>sc bridge</title></head>
 <body><h1>streamcorner bridge</h1>
-<script>
+<script type="module">
 window.__ready = false;
+window.__bootError = '';
 window.__log = [];
 function log(k, d) { window.__log.push({ t: Date.now(), k, d: String(d).slice(0, 2000) }); }
-const w = new Worker('BCJZAtsV.js', { type: 'module', name: 'provider-data' });
-w.onerror = e => log('workererror', (e.message || '') + ' @ line ' + (e.lineno || '?'));
-const pending = new Map();
-let seq = 100;
-w.onmessage = e => {
-  const { requestId, data, error } = e.data || {};
-  const p = pending.get(requestId);
-  if (!p) { log('unmatched', JSON.stringify(e.data).slice(0, 400)); return; }
-  pending.delete(requestId);
-  if (error) p.reject(new Error(String(error)));
-  else p.resolve(data);
-};
-window.rpc = function (msg) {
-  const requestId = ++seq;
-  return new Promise((resolve, reject) => {
-    pending.set(requestId, { resolve, reject });
-    w.postMessage({ requestId, ...msg });
-    setTimeout(() => {
-      if (pending.has(requestId)) {
-        pending.delete(requestId);
-        reject(new Error('worker timeout (20s)'));
-      }
-    }, 20000);
-  });
-};
-log('boot', 'bridge ready');
+try {
+  const catalog = await import(${modulePath});
+  if (typeof catalog.u !== 'function' || typeof catalog.e !== 'function') {
+    throw new Error('catalog module does not expose u/e');
+  }
+  window.rpc = async function (msg) {
+    if (msg.operation === 'provider-list') return catalog.u(msg.providerId);
+    if (msg.operation === 'provider-detail') {
+      const firstUrl = msg.requestUrls && msg.requestUrls[0];
+      const id = firstUrl ? new URL(firstUrl).searchParams.get('id') : '';
+      if (!id) throw new Error('provider detail id missing');
+      return catalog.e(msg.providerId, id);
+    }
+    throw new Error('unsupported catalog operation: ' + msg.operation);
+  };
+  log('boot', 'catalog module ready');
+} catch (error) {
+  window.__bootError = String(error && error.message || error);
+  log('booterror', window.__bootError);
+}
 window.__ready = true;
 </script></body></html>
 `
+}

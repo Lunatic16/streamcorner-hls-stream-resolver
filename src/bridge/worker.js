@@ -82,6 +82,8 @@ class BridgeManager {
           timeout: 30000,
         })
         await this.page.waitForFunction('window.__ready === true', { timeout: 20000 })
+        const bootError = await this.page.evaluate(() => window.__bootError || '')
+        if (bootError) throw new Error(`Worker bridge initialization failed: ${bootError}`)
         console.log('[bridge] Worker bridge successfully initialized and ready.')
       } finally {
         this.isBooting = false
